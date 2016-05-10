@@ -1,9 +1,11 @@
 import json
 import frappe
 import requests
-from requests_oauthlib import OAuth1 as OAuth
-from digitales.digitales.Api_methods import (GetOauthDetails, create_scheduler_exception,
-		log_sync_error, create_item, create_order, create_customer, GetAddress)
+
+from .products import create_or_update_item
+from .customers import create_or_update_customer
+from .orders import create_or_update_sales_order
+from .utils import log_sync_error, GetOauthDetails, create_scheduler_exception
 
 @frappe.whitelist()
 def manually_sync_entity(entity_type, entity):
@@ -17,13 +19,11 @@ def manually_sync_entity(entity_type, entity):
 
 def get_missing_items(item=None, manual_sync=False):
 	""" Get the missing items from magento """
-	# items = get_entity_ids_to_sync(entity_type="Item") if not all(item, manual_sync) else [item]
 	if all([item, manual_sync]):
 		results = json.loads(item) if item else None
 		if results: results = [results]
 	
 	items = get_entity_ids_to_sync(entity_type="Item", results=results)
-	
 	if not items:
 		return
 
@@ -33,7 +33,7 @@ def get_missing_items(item=None, manual_sync=False):
 		response = get_entity_from_magento(url%(item), entity_type="Item", entity_id=item)
 		if response:
 			idx = response.keys()[0]
-			create_item(idx, response)
+			create_or_update_item(response[idx])
 
 	update_sync_status("Item", items)
 
@@ -43,6 +43,7 @@ def get_missing_customers(customer=None, manual_sync=False):
 		results = json.loads(customer) if customer else None
 		if results: results = [results]
 
+	customers = get_entity_ids_to_sync(entity_type="Customer", results=results)
 	if not customers:
 		return
 
@@ -52,8 +53,7 @@ def get_missing_customers(customer=None, manual_sync=False):
 		response = get_entity_from_magento(url%(customer), entity_type="Customer", entity_id=customer)
 		if response:
 			idx = response.keys()[0]
-			create_customer(idx, response)
-			GetAddress(response.get('entity_id'))
+			create_or_update_customer(response[idx])
 
 	update_sync_status("Customer", customers)
 
@@ -74,8 +74,7 @@ def get_missing_orders(order=None, manual_sync=False):
 		response = get_entity_from_magento(url%(order), entity_type="Sales Order", entity_id=order)
 		if response:
 			idx = response.keys()[0]
-			customer = frappe.db.get_value('Contact', {'entity_id': response[idx].get("customer_id") }, 'customer')
-			create_order(idx, response, customer)
+			create_or_update_sales_order(response[idx])
 
 	update_sync_status("Sales Order", orders)
 
@@ -129,7 +128,7 @@ def update_sync_status(entity_type, entities):
 
 def check_if_entity_already_synced(entity_type, entities):
 	""" check if Items or Customer is already synced """
-	field_map = { "Item": "name", "Sales Order": "entity_id", "customer": "entity_id" }
+	field_map = { "Item": "name", "Sales Order": "entity_id", "Customer": "entity_id" }
 	
 	if not entities:
 		return []

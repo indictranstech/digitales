@@ -10,7 +10,7 @@ frappe.ui.form.on("Sync Error Log", "refresh", function(frm) {
 			entity.sync_docname = frm.doc.sync_docname;
 
 			return frappe.call({
-				method: "digitales.digitales.sync_missing_entities.manually_sync_entity",
+				method: "digitales.sync.sync_missing_entities.manually_sync_entity",
 				args: {
 					"entity_type": frm.doc.sync_doctype,
 					entity: entity

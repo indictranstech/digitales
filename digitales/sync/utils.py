@@ -28,9 +28,17 @@ def get_entity_and_page_count(max_date, entity_type="Item"):
 	response = get_entities_from_magento(url, entity_type="Item")
 
 	if response:
+		entity_count = response.get(entity_count[entity_type])
+		page_count = response.get(page_count[entity_type])
+
+		if all([entity_type in ["Item", "Customer"], page_count >= 5]):
+			page_count = 5
+		elif all([entity_type == "Sales Order", page_count > 1]):
+			page_count = 1
+
 		return {
-			"entity_count": response.get(entity_count[entity_type]),
-			"page_count": response.get(page_count[entity_type])
+			"entity_count": entity_count,
+			"page_count": page_count
 		}
 	else:
 		return None
