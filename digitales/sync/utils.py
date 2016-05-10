@@ -4,9 +4,8 @@ import frappe
 import requests
 import datetime
 from frappe import _
-from frappe.utils import get_datetime, now
+from frappe.utils import get_datetime, now, now_datetime
 from requests_oauthlib import OAuth1 as OAuth
-from digitales.digitales.Api_methods import update_execution_date, GetOauthDetails, create_scheduler_exception
 
 def date_minus_sec(date):
 	return get_datetime(date) - datetime.timedelta(seconds=1)
@@ -63,12 +62,15 @@ def get_entities_from_magento(url, entity_type=None):
 def log_sync_status(
 	entity_type, count_response={},
 	entities_to_sync=0, pages_to_sync=0,
-	synced_entities={}):
+	synced_entities={}, start=None,
+	end=None):
 
 	""" log Magento >> ERPNext entity sync status """
 
 	log = frappe.new_doc("Sync Log")
-	log.date = now()
+	log.date = start or now_datetime()
+	log.sync_end = end or now_datetime()
+	log.sync_time = end - start
 	log.entity_type = entity_type
 	log.total_count = entities_to_sync
 	log.pagewise_count = pages_to_sync - 1 if pages_to_sync else 0
@@ -78,3 +80,60 @@ def log_sync_status(
 	log.synced_entities = json.dumps(synced_entities)
 	log.sync_stat = ""
 	log.save(ignore_permissions=True)
+
+def log_sync_error(
+		doctype, docname, response,
+		error, method, missing_items=None,
+		missing_customer=None, force_stop=False
+	):
+
+	import traceback
+	name = frappe.db.get_value("Sync Error Log", { "sync_doctype": doctype, "sync_docname":docname }, "name")
+
+	if name:
+		log = frappe.get_doc("Sync Error Log", name)
+	else:
+		log = frappe.new_doc("Sync Error Log")
+		log.sync_doctype = doctype
+		log.sync_docname = "{}".format(docname)
+
+	log.sync_attempts += 1
+	log.is_synced = "Stopped" if log.sync_attempts >= 3 or force_stop else "No"
+
+	err = log.append("errors", {})
+	err.method = method
+	err.error = str(error)
+	err.obj_traceback = frappe.get_traceback()
+	err.response = json.dumps(response)
+	
+	log.missing_items = json.dumps(missing_items) or ""
+	log.missing_customer = missing_customer or ""
+	log.magento_response = "<pre><code>%s</code></pre>"%(json.dumps(response, indent=2))
+	log.save(ignore_permissions=True)
+
+def GetOauthDetails():
+	""" get auth object """
+	try:
+		oauth_details = frappe.db.get_value('API Configuration Page', None, '*', as_dict=1)
+		oauth = OAuth(
+			client_key = oauth_details.client_key,
+			client_secret = oauth_details.client_secret,
+			resource_owner_key = oauth_details.owner_key,
+			resource_owner_secret=oauth_details.owner_secret
+		)
+		return oauth
+	except Exception, e:
+		create_scheduler_exception(e, 'GetOauthDetails', frappe.get_traceback())
+
+#update configuration
+def update_execution_date(document):
+	now_plus_10 = datetime.datetime.now() + datetime.timedelta(minutes = 30)
+	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='date'"""%(now_plus_10.strftime('%Y-%m-%d %H:%M:%S')))
+	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='api_type'"""%(document))
+
+def create_scheduler_exception(msg, method, obj=None):
+	se = frappe.new_doc('Scheduler Log')
+	se.method = method
+	se.error = msg
+	se.obj_traceback = cstr(obj)
+	se.save(ignore_permissions=True)

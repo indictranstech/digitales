@@ -440,221 +440,221 @@ def validate_qty_on_submit(doc,method):
 			frappe.throw("Delivered Quantity must be less than or equal to assigned_qty for item_code='"+d.item_code+"'")
 	doc.total_qty = qty_count
 
-def check_APItime():
-	time = frappe.db.sql("""select value from `tabSingles` where doctype='API Configuration Page' and field in ('date','api_type')""",as_list=1)
-	if time:
-		dates= list(itertools.chain.from_iterable(time))
-		api_date = datetime.datetime.strptime(dates[1], '%Y-%m-%d %H:%M:%S')
-		if datetime.datetime.now() > api_date and dates[0] =='Product':
-			GetItem()
-			get_missing_items()
-		elif datetime.datetime.now() > api_date and dates[0]=='Customer':
-			GetCustomer()
-			get_missing_customers()
-		elif datetime.datetime.now() > api_date and dates[0]=='Order':
-			GetOrders()
-			get_missing_orders()
+# def check_APItime():
+# 	time = frappe.db.sql("""select value from `tabSingles` where doctype='API Configuration Page' and field in ('date','api_type')""",as_list=1)
+# 	if time:
+# 		dates= list(itertools.chain.from_iterable(time))
+# 		api_date = datetime.datetime.strptime(dates[1], '%Y-%m-%d %H:%M:%S')
+# 		if datetime.datetime.now() > api_date and dates[0] =='Product':
+# 			GetItem()
+# 			get_missing_items()
+# 		elif datetime.datetime.now() > api_date and dates[0]=='Customer':
+# 			GetCustomer()
+# 			get_missing_customers()
+# 		elif datetime.datetime.now() > api_date and dates[0]=='Order':
+# 			GetOrders()
+# 			get_missing_orders()
 
-def get_Data_count(max_date, document_key, headers, oauth_data):
-	r = requests.get(url='http://digitales.com.au/api/rest/mcount?start_date='+cstr(max_date)+'', headers=headers, auth=oauth_data)
-	total_page_count = json.loads(r.content)
-	if total_page_count.get(document_key) > 0:
-		return total_page_count.get(document_key)
-	return 0
+# def get_Data_count(max_date, document_key, headers, oauth_data):
+# 	r = requests.get(url='http://digitales.com.au/api/rest/mcount?start_date='+cstr(max_date)+'', headers=headers, auth=oauth_data)
+# 	total_page_count = json.loads(r.content)
+# 	if total_page_count.get(document_key) > 0:
+# 		return total_page_count.get(document_key)
+# 	return 0
 
-def GetItem():
-	update_execution_date('Customer')
-	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
-	oauth = GetOauthDetails()
-	max_item_date = '1991-09-07 05:43:13'
-	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabItem` """,as_list=1)
-	if max_date[0][0]!=None:
-		max_item_date = max_date[0][0]
-	max_item_date = max_item_date.split('.')[0] if '.' in max_item_date else max_item_date
-	max_item_date = (datetime.datetime.strptime(max_item_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-	status = get_SyncItemsCount(max_item_date, h, oauth)	
+# def GetItem():
+# 	update_execution_date('Customer')
+# 	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+# 	oauth = GetOauthDetails()
+# 	max_item_date = '1991-09-07 05:43:13'
+# 	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabItem` """,as_list=1)
+# 	if max_date[0][0]!=None:
+# 		max_item_date = max_date[0][0]
+# 	max_item_date = max_item_date.split('.')[0] if '.' in max_item_date else max_item_date
+# 	max_item_date = (datetime.datetime.strptime(max_item_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+# 	status = get_SyncItemsCount(max_item_date, h, oauth)	
 
-def get_SyncItemsCount(max_date, header, oauth_data):
-	count = get_Data_count(max_date, 'product_pages_per_100_mcount', header, oauth_data)
-	original_count = count
-	count = 15 if count > 15 else count
-	pagewise_count = {}
-	if count > 0:
-		for index in range(1, count+1):
-			products_count = get_products_from_magento(index, max_date,header, oauth_data)
-			pagewise_count[index] = products_count
-		make_sync_log(json.dumps(pagewise_count), original_count, count, max_date)
+# def get_SyncItemsCount(max_date, header, oauth_data):
+# 	count = get_Data_count(max_date, 'product_pages_per_100_mcount', header, oauth_data)
+# 	original_count = count
+# 	count = 15 if count > 15 else count
+# 	pagewise_count = {}
+# 	if count > 0:
+# 		for index in range(1, count+1):
+# 			products_count = get_products_from_magento(index, max_date,header, oauth_data)
+# 			pagewise_count[index] = products_count
+# 		make_sync_log(json.dumps(pagewise_count), original_count, count, max_date)
 
-def get_products_from_magento(page, max_date, header, oauth_data):
-	products_count = 0
-	if page:
-		r = requests.get(url='http://digitales.com.au/api/rest/products?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
-		product_data = json.loads(r.content)
-		products_count = len(product_data)
-		print 'http://digitales.com.au/api/rest/products?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), products_count
-		s
-		if products_count > 0:
-			for index in product_data:
-				name = frappe.db.get_value('Item', product_data[index].get('sku'), 'name')
-				if name:
-					update_item(name, index, product_data)
-					check_item_price(name,index,product_data)
-				else:
-					create_item(index, product_data)
-	return products_count
+# def get_products_from_magento(page, max_date, header, oauth_data):
+# 	products_count = 0
+# 	if page:
+# 		r = requests.get(url='http://digitales.com.au/api/rest/products?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
+# 		product_data = json.loads(r.content)
+# 		products_count = len(product_data)
+# 		print 'http://digitales.com.au/api/rest/products?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), products_count
+# 		s
+# 		if products_count > 0:
+# 			for index in product_data:
+# 				name = frappe.db.get_value('Item', product_data[index].get('sku'), 'name')
+# 				if name:
+# 					update_item(name, index, product_data)
+# 					check_item_price(name,index,product_data)
+# 				else:
+# 					create_item(index, product_data)
+# 	return products_count
 
-def make_sync_log(pagewise_count, original_count, synced_count, max_date):
-	slog = frappe.new_doc('Sync Log')
-	slog.pagewise_count = pagewise_count
-	slog.total_count = original_count
-	slog.synced_count = synced_count
-	slog.date = max_date
-	slog.save(ignore_permissions=True)
+# def make_sync_log(pagewise_count, original_count, synced_count, max_date):
+# 	slog = frappe.new_doc('Sync Log')
+# 	slog.pagewise_count = pagewise_count
+# 	slog.total_count = original_count
+# 	slog.synced_count = synced_count
+# 	slog.date = max_date
+# 	slog.save(ignore_permissions=True)
 
-def create_item(i,content):
-	try:
-		item = frappe.new_doc('Item')
-		item.item_code = content[i].get('sku')
-		create_new_product(item,i,content)
-		item.save(ignore_permissions=True)
-		check_item_price(item.name,i,content)
-	except Exception, e:
-		docname = content[i].get('sku')
-		response = content
-		log_sync_error("Item", docname, response, e, "create_item")
+# def create_item(i,content):
+# 	try:
+# 		item = frappe.new_doc('Item')
+# 		item.item_code = content[i].get('sku')
+# 		create_new_product(item,i,content)
+# 		item.save(ignore_permissions=True)
+# 		check_item_price(item.name,i,content)
+# 	except Exception, e:
+# 		docname = content[i].get('sku')
+# 		response = content
+# 		log_sync_error("Item", docname, response, e, "create_item")
 
-def update_item(name,i,content):
-	try:
-		item = frappe.get_doc("Item", name)
-		create_new_product(item,i,content)
-		item.save(ignore_permissions=True)
-	except Exception, e:
-		docname = content[i].get('sku')
-		response = content
-		log_sync_error("Item", docname, response, e, "update_item")
+# def update_item(name,i,content):
+# 	try:
+# 		item = frappe.get_doc("Item", name)
+# 		create_new_product(item,i,content)
+# 		item.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		docname = content[i].get('sku')
+# 		response = content
+# 		log_sync_error("Item", docname, response, e, "update_item")
 
-def check_item_price(name,i,content):
-	if content[i].get('price'):
-		price_list=get_price_list()
-		if price_list:
-			item_price_list_name=frappe.db.get_value('Item Price',{'item_code':name,'price_list':price_list},'name')
-			if item_price_list_name:
-				update_price_list(item_price_list_name,i,content,price_list)
-			else:
-				create_price_list(name,i,content,price_list)
+# def check_item_price(name,i,content):
+# 	if content[i].get('price'):
+# 		price_list=get_price_list()
+# 		if price_list:
+# 			item_price_list_name=frappe.db.get_value('Item Price',{'item_code':name,'price_list':price_list},'name')
+# 			if item_price_list_name:
+# 				update_price_list(item_price_list_name,i,content,price_list)
+# 			else:
+# 				create_price_list(name,i,content,price_list)
 
-def get_price_list():
-		price_list=frappe.db.sql("""select value from `tabSingles` where doctype='Configuration Page'
-					and field='price_list'""",as_list=1)
-		if price_list:
-			return price_list[0][0]
-		else:
-			frappe.msgprint("Please specify default price list in Configuration Page",raise_exception=1)
+# def get_price_list():
+# 		price_list=frappe.db.sql("""select value from `tabSingles` where doctype='Configuration Page'
+# 					and field='price_list'""",as_list=1)
+# 		if price_list:
+# 			return price_list[0][0]
+# 		else:
+# 			frappe.msgprint("Please specify default price list in Configuration Page",raise_exception=1)
 
-def update_price_list(price_list_name,i,content,price_list):
-	try:
-		item_price = frappe.get_doc("Item Price", price_list_name)
-		create_new_item_price(item_price,i,content,price_list)
-		item_price.save(ignore_permissions=True)
-	except Exception, e:
-		docname = content[i].get('sku')
-		response = content
-		log_sync_error("Item", docname, response, e, "update_price_list")
+# def update_price_list(price_list_name,i,content,price_list):
+# 	try:
+# 		item_price = frappe.get_doc("Item Price", price_list_name)
+# 		create_new_item_price(item_price,i,content,price_list)
+# 		item_price.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		docname = content[i].get('sku')
+# 		response = content
+# 		log_sync_error("Item", docname, response, e, "update_price_list")
 
-def create_price_list(item,i,content,price_list):
-	try:
-		item_price=frappe.new_doc("Item Price")
-		create_new_item_price(item_price,i,content,price_list)
-		item_price.save(ignore_permissions=True)
-	except Exception, e:
-		docname = content[i].get('sku')
-		response = content
-		log_sync_error("Item", docname, response, e, "update_price_list")
+# def create_price_list(item,i,content,price_list):
+# 	try:
+# 		item_price=frappe.new_doc("Item Price")
+# 		create_new_item_price(item_price,i,content,price_list)
+# 		item_price.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		docname = content[i].get('sku')
+# 		response = content
+# 		log_sync_error("Item", docname, response, e, "update_price_list")
 
-def create_new_item_price(item_price,i,content,price_list):
-	item_price.price_list=price_list
-	item_price.item_code=content[i].get('sku')
-	item_price.price_list_rate=content[i].get('price')
-	return True
+# def create_new_item_price(item_price,i,content,price_list):
+# 	item_price.price_list=price_list
+# 	item_price.item_code=content[i].get('sku')
+# 	item_price.price_list_rate=content[i].get('price')
+# 	return True
 
-def create_new_product(item,i,content):
-	item.event_id=i
-	item.artist = content[i].get('artist')
-	item.item_name=content[i].get('name') or content[i].get('sku')
-	item.item_group = media_type(content[i].get('media'))
-	item.description = 'Desc: ' + content[i].get('short_description') if content[i].get('short_description') else content[i].get('sku')
-	warehouse=get_own_warehouse()
-	item.default_warehouse=warehouse
-	if content[i].get('barcode') and not frappe.db.get_value('Item', {'barcode':content[i].get('barcode')}, 'name'):
-		item.barcode = content[i].get('barcode')
-	item.modified_date = content[i].get('updated_at')
-	item.distributor = content[i].get('distributor')
-	item.product_release_date = content[i].get('release_date')
-	item.default_supplier = get_supplier(content[i].get('distributor'))
-	item.expense_account, item.income_account = default_ExpenxeIncomeAccount(item.item_group)
-	return True
+# def create_new_product(item,i,content):
+# 	item.event_id=i
+# 	item.artist = content[i].get('artist')
+# 	item.item_name=content[i].get('name') or content[i].get('sku')
+# 	item.item_group = media_type(content[i].get('media'))
+# 	item.description = 'Desc: ' + content[i].get('short_description') if content[i].get('short_description') else content[i].get('sku')
+# 	warehouse=get_own_warehouse()
+# 	item.default_warehouse=warehouse
+# 	if content[i].get('barcode') and not frappe.db.get_value('Item', {'barcode':content[i].get('barcode')}, 'name'):
+# 		item.barcode = content[i].get('barcode')
+# 	item.modified_date = content[i].get('updated_at')
+# 	item.distributor = content[i].get('distributor')
+# 	item.product_release_date = content[i].get('release_date')
+# 	item.default_supplier = get_supplier(content[i].get('distributor'))
+# 	item.expense_account, item.income_account = default_ExpenxeIncomeAccount(item.item_group)
+	# return True
 
-def media_type(itemgroup):
-	media = 'Products'
-	if itemgroup:
-		media = itemgroup
-		media = media.split(',')[0]
-		if not frappe.db.get_value('Item Group', media, 'name'):
-			create_new_itemgroup(media)
-	return media
+# def media_type(itemgroup):
+# 	media = 'Products'
+# 	if itemgroup:
+# 		media = itemgroup
+# 		media = media.split(',')[0]
+# 		if not frappe.db.get_value('Item Group', media, 'name'):
+# 			create_new_itemgroup(media)
+# 	return media
 
-def default_ExpenxeIncomeAccount(media):
-	# Check item group and assign the default expence and income account
-	expense_account, income_account = '', ''
-	if media in ['DVD', 'CD', 'BLURAY', 'Graphic Novel', 'CDROM', 'Audio Book', 'Manga',
-				'Online Resource', 'Blu-Ray', 'PC Games', 'Hardcover', 'Playstation 3',
-				'Xbox 360', 'Xbox One', 'Playstation 4', 'Nintendo Wii U', '2CD and DVD',
-				'Graphics', '3D', 'UV', 'BLURAY, 3D', 'Nintendo 3DS', 'Nintendo Wii', 'DVD, UV',
-				'BLURAY, DVD', 'BLURAY, DVD, UV', 'Playstation Vita', 'Paperback']:
-		expense_account = "5-1100 Cost of Goods Sold : COGS Stock"
-		income_account = "4-1100 Product Sales"
+# def default_ExpenxeIncomeAccount(media):
+# 	# Check item group and assign the default expence and income account
+# 	expense_account, income_account = '', ''
+# 	if media in ['DVD', 'CD', 'BLURAY', 'Graphic Novel', 'CDROM', 'Audio Book', 'Manga',
+# 				'Online Resource', 'Blu-Ray', 'PC Games', 'Hardcover', 'Playstation 3',
+# 				'Xbox 360', 'Xbox One', 'Playstation 4', 'Nintendo Wii U', '2CD and DVD',
+# 				'Graphics', '3D', 'UV', 'BLURAY, 3D', 'Nintendo 3DS', 'Nintendo Wii', 'DVD, UV',
+# 				'BLURAY, DVD', 'BLURAY, DVD, UV', 'Playstation Vita', 'Paperback']:
+# 		expense_account = "5-1100 Cost of Goods Sold : COGS Stock"
+# 		income_account = "4-1100 Product Sales"
 
-	return expense_account, income_account
+# 	return expense_account, income_account
 
-def get_supplier(supplier):
-	temp = ''
-	if supplier:
-		if frappe.db.get_value('Customer', supplier, 'name'):
-			supplier = supplier + '(s)'
-			temp = supplier
-		name = supplier if frappe.db.get_value('Supplier', supplier, 'name') else create_supplier(supplier)
-		if temp:
-			update_supplier(supplier)
-		return name
-	return ''
+# def get_supplier(supplier):
+# 	temp = ''
+# 	if supplier:
+# 		if frappe.db.get_value('Customer', supplier, 'name'):
+# 			supplier = supplier + '(s)'
+# 			temp = supplier
+# 		name = supplier if frappe.db.get_value('Supplier', supplier, 'name') else create_supplier(supplier)
+# 		if temp:
+# 			update_supplier(supplier)
+# 		return name
+# 	return ''
 
-def update_supplier(supplier):
-	try:
-		obj = frappe.get_doc('Supplier', supplier)
-		obj.supplier_name = supplier.replace('(s)', '')
-		obj.save(ignore_permissions=True)
-	except Exception,e:
-		create_scheduler_exception(e , 'method name update_supplier: ' ,supplier)
-	return True
+# def update_supplier(supplier):
+# 	try:
+# 		obj = frappe.get_doc('Supplier', supplier)
+# 		obj.supplier_name = supplier.replace('(s)', '')
+# 		obj.save(ignore_permissions=True)
+# 	except Exception,e:
+# 		create_scheduler_exception(e , 'method name update_supplier: ' ,supplier)
+# 	return True
 
-def create_supplier(supplier):
-	try:
-		sl = frappe.new_doc('Supplier')
-		sl.supplier_name = supplier
-		sl.supplier_type = 'Stock supplier' if frappe.db.get_value('Supplier Type', 'Stock supplier', 'name') else create_supplier_type()
-		sl.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'method name create_supplier: ' , supplier)
-	return sl.name
+# def create_supplier(supplier):
+# 	try:
+# 		sl = frappe.new_doc('Supplier')
+# 		sl.supplier_name = supplier
+# 		sl.supplier_type = 'Stock supplier' if frappe.db.get_value('Supplier Type', 'Stock supplier', 'name') else create_supplier_type()
+# 		sl.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'method name create_supplier: ' , supplier)
+# 	return sl.name
 
-def create_supplier_type():
-	try:
-		st = frappe.new_doc('Supplier Type')
-		st.supplier_type = 'Stock supplier'
-		st.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e, 'method name create_supplier_type: ' , 'supplier type')
-	return st.name
+# def create_supplier_type():
+# 	try:
+# 		st = frappe.new_doc('Supplier Type')
+# 		st.supplier_type = 'Stock supplier'
+# 		st.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e, 'method name create_supplier_type: ' , 'supplier type')
+# 	return st.name
 
 def check_uom_conversion(item):
 	stock_uom=frappe.db.sql(""" select stock_uom from `tabItem` where name='%s'"""%item,as_list=1)
@@ -669,427 +669,432 @@ def check_uom_conversion(item):
 	else:
 		return False
 
-def create_new_itemgroup(item_group):
-	try:
-		itemgroup=frappe.new_doc('Item Group')
-		itemgroup.parent_item_group='All Item Groups'
-		itemgroup.item_group_name=item_group
-		itemgroup.is_group='No'
-		itemgroup.save()
-	except Exception, e:
-		create_scheduler_exception(e , 'method name create_new_itemgroup: ' , item_group)
-	return itemgroup.name or 'Products'
+# def create_new_itemgroup(item_group):
+# 	try:
+# 		itemgroup=frappe.new_doc('Item Group')
+# 		itemgroup.parent_item_group='All Item Groups'
+# 		itemgroup.item_group_name=item_group
+# 		itemgroup.is_group='No'
+# 		itemgroup.save()
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'method name create_new_itemgroup: ' , item_group)
+# 	return itemgroup.name or 'Products'
 
-def get_own_warehouse():
-	warehouse=frappe.db.sql("""select value from `tabSingles` where doctype='Configuration Page'
-				and field='own_warehouse'""",as_list=1)
-	if warehouse:
-		return warehouse[0][0]
-	else:
-		frappe.msgprint("Please specify default own warehouse in Configuration Page",raise_exception=1)
+# def get_own_warehouse():
+# 	warehouse=frappe.db.sql("""select value from `tabSingles` where doctype='Configuration Page'
+# 				and field='own_warehouse'""",as_list=1)
+# 	if warehouse:
+# 		return warehouse[0][0]
+# 	else:
+# 		frappe.msgprint("Please specify default own warehouse in Configuration Page",raise_exception=1)
 
-def GetOauthDetails():
-	try:
-		oauth_details = frappe.db.get_value('API Configuration Page', None, '*', as_dict=1)
-		oauth=OAuth(client_key=oauth_details.client_key, client_secret=oauth_details.client_secret, resource_owner_key= oauth_details.owner_key, resource_owner_secret=oauth_details.owner_secret)
-		return oauth
-	except Exception, e:
-		create_scheduler_exception(e , 'method name GetOauthDetails: ' , 'oauth_details')
+# def GetOauthDetails():
+# 	try:
+# 		oauth_details = frappe.db.get_value('API Configuration Page', None, '*', as_dict=1)
+# 		oauth = OAuth(
+# 			client_key = oauth_details.client_key,
+# 			client_secret = oauth_details.client_secret,
+# 			resource_owner_key = oauth_details.owner_key,
+# 			resource_owner_secret=oauth_details.owner_secret
+# 		)
+# 		return oauth
+# 	except Exception, e:
+# 		create_scheduler_exception(e, 'GetOauthDetails', frappe.get_traceback())
 
-#update configuration
-def update_execution_date(document):
-	now_plus_10 = datetime.datetime.now() + datetime.timedelta(minutes = 30)
-	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='date'"""%(now_plus_10.strftime('%Y-%m-%d %H:%M:%S')))
-	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='api_type'"""%(document))
+# #update configuration
+# def update_execution_date(document):
+# 	now_plus_10 = datetime.datetime.now() + datetime.timedelta(minutes = 30)
+# 	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='date'"""%(now_plus_10.strftime('%Y-%m-%d %H:%M:%S')))
+# 	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='api_type'"""%(document))
 
-def GetCustomer():
-	update_execution_date('Order')
-	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
-	oauth = GetOauthDetails()
-	max_customer_date = '1988-09-07 05:43:13'
-	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabCustomer` """,as_list=1)
-	if max_date[0][0]!=None:
-		max_customer_date = max_date[0][0]
-	max_customer_date = max_customer_date.split('.')[0] if '.' in max_customer_date else max_customer_date
-	max_customer_date = (datetime.datetime.strptime(max_customer_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-	status=get_SyncCustomerCount(max_customer_date, h, oauth)
+# def GetCustomer():
+# 	update_execution_date('Order')
+# 	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+# 	oauth = GetOauthDetails()
+# 	max_customer_date = '1988-09-07 05:43:13'
+# 	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabCustomer` """,as_list=1)
+# 	if max_date[0][0]!=None:
+# 		max_customer_date = max_date[0][0]
+# 	max_customer_date = max_customer_date.split('.')[0] if '.' in max_customer_date else max_customer_date
+# 	max_customer_date = (datetime.datetime.strptime(max_customer_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+# 	status=get_SyncCustomerCount(max_customer_date, h, oauth)
 
-def get_SyncCustomerCount(max_date, header, oauth_data):
-	count = get_Data_count(max_date, 'customer_pages_per_100_mcount', header, oauth_data)
-	count = 25 if count > 30 else count
-	if count > 0:
-		for index in range(1, count+1):
-			get_customers_from_magento(index, max_date,header, oauth_data, 'missed')
+# def get_SyncCustomerCount(max_date, header, oauth_data):
+# 	count = get_Data_count(max_date, 'customer_pages_per_100_mcount', header, oauth_data)
+# 	count = 25 if count > 30 else count
+# 	if count > 0:
+# 		for index in range(1, count+1):
+# 			get_customers_from_magento(index, max_date,header, oauth_data, 'missed')
 
-def get_customers_from_magento(page, max_date, header, oauth_data,type_of_data=None):
-	try:
-		if page:
-			r = requests.get(url='http://digitales.com.au/api/rest/customers?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
-			customer_data = json.loads(r.content)
-			if len(customer_data) > 0:
-				for index in customer_data:
-					name = frappe.db.get_value('Customer', customer_data[index].get('organisation').replace("'",""), 'name')
-					if name:
-						update_customer(name, index, customer_data)
-						GetAddress(customer_data[index].get('entity_id'))
-					else:
-						create_customer(index, customer_data)
-						GetAddress(customer_data[index].get('entity_id'))
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name get_customers_from_magento' , customer_data[index].get('organisation'))
+# def get_customers_from_magento(page, max_date, header, oauth_data,type_of_data=None):
+# 	try:
+# 		if page:
+# 			r = requests.get(url='http://digitales.com.au/api/rest/customers?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
+# 			customer_data = json.loads(r.content)
+# 			if len(customer_data) > 0:
+# 				for index in customer_data:
+# 					name = frappe.db.get_value('Customer', customer_data[index].get('organisation').replace("'",""), 'name')
+# 					if name:
+# 						update_customer(name, index, customer_data)
+# 						GetAddress(customer_data[index].get('entity_id'))
+# 					else:
+# 						create_customer(index, customer_data)
+# 						GetAddress(customer_data[index].get('entity_id'))
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name get_customers_from_magento' , customer_data[index].get('organisation'))
 
-def create_customer(i,content):
-	temp_customer = ''
-	customer = frappe.new_doc('Customer')
-	if frappe.db.get_value('Supplier',content[i].get('organisation').replace("'",""),'name') or frappe.db.get_value('Customer Group',content[i].get('organisation').replace("'",""),'name'):
-		temp_customer= customer.customer_name = cstr(content[i].get('organisation')).replace("'","") + '(C)'
-	else:
-		customer.customer_name=cstr(content[i].get('organisation')).replace("'","")
-	if not frappe.db.get_value('Customer', customer.customer_name, 'name'):
-		create_new_customer(customer,i,content)
-	create_contact(customer,i,content)
-	if temp_customer:
-		update_customer_name(temp_customer)
+# def create_customer(i,content):
+# 	temp_customer = ''
+# 	customer = frappe.new_doc('Customer')
+# 	if frappe.db.get_value('Supplier',content[i].get('organisation').replace("'",""),'name') or frappe.db.get_value('Customer Group',content[i].get('organisation').replace("'",""),'name'):
+# 		temp_customer= customer.customer_name = cstr(content[i].get('organisation')).replace("'","") + '(C)'
+# 	else:
+# 		customer.customer_name=cstr(content[i].get('organisation')).replace("'","")
+# 	if not frappe.db.get_value('Customer', customer.customer_name, 'name'):
+# 		create_new_customer(customer,i,content)
+# 	create_contact(customer,i,content)
+# 	if temp_customer:
+# 		update_customer_name(temp_customer)
 
-def update_customer_name(customer_name):
-	try:
-		customer = frappe.get_doc("Customer", customer_name)
-		customer.customer_name= customer_name.replace("(C)","")
-		customer.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name update_customer_name: ' , customer_name)
+# def update_customer_name(customer_name):
+# 	try:
+# 		customer = frappe.get_doc("Customer", customer_name)
+# 		customer.customer_name= customer_name.replace("(C)","")
+# 		customer.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name update_customer_name: ' , customer_name)
 
-def update_customer(customer,i ,content):
-	customer = frappe.get_doc("Customer", customer)
-	create_new_customer(customer,i,content)
-	contact=frappe.db.sql("""select name from `tabContact` where entity_id='%s'"""%content[i].get('entity_id'),as_list=1)
-	if contact:
-		update_contact(customer,i,content,contact[0][0])
-	else:
-		create_contact(customer,i,content)
+# def update_customer(customer,i ,content):
+# 	customer = frappe.get_doc("Customer", customer)
+# 	create_new_customer(customer,i,content)
+# 	contact=frappe.db.sql("""select name from `tabContact` where entity_id='%s'"""%content[i].get('entity_id'),as_list=1)
+# 	if contact:
+# 		update_contact(customer,i,content,contact[0][0])
+# 	else:
+# 		create_contact(customer,i,content)
 
-def update_contact(customer,i,content,contact):
-	contact = frappe.get_doc("Contact", contact)
-	create_customer_contact(customer,i,content,contact)
+# def update_contact(customer,i,content,contact):
+# 	contact = frappe.get_doc("Contact", contact)
+# 	create_customer_contact(customer,i,content,contact)
 
-def create_contact(customer,i,content):
-	contact=frappe.new_doc('Contact')
-	if not frappe.db.get_value('Contact', {'entity_id':content[i].get('entity_id')}, 'name'):
-		create_customer_contact(customer,i,content,contact)
+# def create_contact(customer,i,content):
+# 	contact=frappe.new_doc('Contact')
+# 	if not frappe.db.get_value('Contact', {'entity_id':content[i].get('entity_id')}, 'name'):
+# 		create_customer_contact(customer,i,content,contact)
 
-def create_new_customer(customer,i,content):
-	import itertools
-	try:
-		customer.entity_id = content[i].get('entity_id')
-		customer.customer_type = 'Company'
-		if content[i].get('group'):
-			if content[i].get('group').strip() == 'General':
-				customer.customer_group= 'All Customer Groups'
-			elif frappe.db.get_value('Customer Group', content[i].get('group').strip(), 'name'):
-				customer.customer_group=content[i].get('group').strip() or 'All Customer Groups'
-			elif frappe.db.get_value('Customer', content[i].get('group').strip(), 'name'):
-				customer.customer_group = 'All Customer Groups'
-			else:
-				customer_group=create_customer_group(content[i].get('group').strip())
-				customer.customer_group=customer_group
-		customer.territory = 'Australia'
-		customer.customer_status = 'Existing'
-		customer.modified_date=content[i].get('updated_at')
-		customer.save(ignore_permissions=True)
-	except Exception, e:
-		docname = content[i].get('entity_id')
-		response = content
-		log_sync_error("Customer", docname, response, e, "create_new_customer")
+# def create_new_customer(customer,i,content):
+# 	import itertools
+# 	try:
+# 		customer.entity_id = content[i].get('entity_id')
+# 		customer.customer_type = 'Company'
+# 		if content[i].get('group'):
+# 			if content[i].get('group').strip() == 'General':
+# 				customer.customer_group= 'All Customer Groups'
+# 			elif frappe.db.get_value('Customer Group', content[i].get('group').strip(), 'name'):
+# 				customer.customer_group=content[i].get('group').strip() or 'All Customer Groups'
+# 			elif frappe.db.get_value('Customer', content[i].get('group').strip(), 'name'):
+# 				customer.customer_group = 'All Customer Groups'
+# 			else:
+# 				customer_group=create_customer_group(content[i].get('group').strip())
+# 				customer.customer_group=customer_group
+# 		customer.territory = 'Australia'
+# 		customer.customer_status = 'Existing'
+# 		customer.modified_date=content[i].get('updated_at')
+# 		customer.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		docname = content[i].get('entity_id')
+# 		response = content
+# 		log_sync_error("Customer", docname, response, e, "create_new_customer")
 
-def create_customer_contact(customer,i,content,contact):
-	try:
-		if content[i].get('firstname'):
-			contact.first_name=content[i].get('firstname')
-			contact.last_name=content[i].get('lastname')
-			contact.customer= customer.customer_name
-			contact.customer_name= frappe.db.get_value('Customer', contact.customer, 'customer_name')
-			contact.entity_id = content[i].get('entity_id')
-			contact.email_id=content[i].get('email')
-			contact.save(ignore_permissions=True)
-	except Exception, e:
-		docname = content[i].get('entity_id')
-		response = content
-		log_sync_error("Customer", docname, response, e, "create_customer_contact")
+# def create_customer_contact(customer,i,content,contact):
+# 	try:
+# 		if content[i].get('firstname'):
+# 			contact.first_name=content[i].get('firstname')
+# 			contact.last_name=content[i].get('lastname')
+# 			contact.customer= customer.customer_name
+# 			contact.customer_name= frappe.db.get_value('Customer', contact.customer, 'customer_name')
+# 			contact.entity_id = content[i].get('entity_id')
+# 			contact.email_id=content[i].get('email')
+# 			contact.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		docname = content[i].get('entity_id')
+# 		response = content
+# 		log_sync_error("Customer", docname, response, e, "create_customer_contact")
 
-def create_new_contact(customer,i,content):
-	try:
-		contact=frappe.new_doc('Contact')
-		if content[i].get('firstname'):
-			contact.first_name=content[i].get('firstname')
-			contact.last_name=content[i].get('lastname')
-			contact.customer= customer
-			contact.customer_name=customer
-			contact.entity_id = content[i].get('entity_id')
-			contact.email_id=content[i].get('email')
-			contact.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name create_new_contact: ', content[i])
+# def create_new_contact(customer,i,content):
+# 	try:
+# 		contact=frappe.new_doc('Contact')
+# 		if content[i].get('firstname'):
+# 			contact.first_name=content[i].get('firstname')
+# 			contact.last_name=content[i].get('lastname')
+# 			contact.customer= customer
+# 			contact.customer_name=customer
+# 			contact.entity_id = content[i].get('entity_id')
+# 			contact.email_id=content[i].get('email')
+# 			contact.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name create_new_contact: ', content[i])
 
-def create_customer_group(i):
-	try:
-		cg=frappe.new_doc('Customer Group')
-		cg.customer_group_name = i
-		cg.parent_customer_group='All Customer Groups'
-		cg.is_group='No'
-		cg.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name create_customer_group: ', i)
-	return cg.name or 'All Customer Group'
+# def create_customer_group(i):
+# 	try:
+# 		cg=frappe.new_doc('Customer Group')
+# 		cg.customer_group_name = i
+# 		cg.parent_customer_group='All Customer Groups'
+# 		cg.is_group='No'
+# 		cg.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name create_customer_group: ', i)
+# 	return cg.name or 'All Customer Group'
 
-def sync_existing_customers_address():
-	offset = frappe.db.get_value('API Configuration Page', None, 'offset_limit')
-	if offset:
-		customer_data = frappe.db.sql(''' Select entity_id from tabContact order by creation limit %s, 100'''%(offset), as_dict=1)
-		frappe.db.sql(''' update `tabSingles` set value = "%s" where doctype = "API Configuration Page" and field="offset_limit"'''%(cint(offset)+100))
-		if customer_data:
-			for data in customer_data:
-				GetAddress(data.entity_id)
+# def sync_existing_customers_address():
+# 	offset = frappe.db.get_value('API Configuration Page', None, 'offset_limit')
+# 	if offset:
+# 		customer_data = frappe.db.sql(''' Select entity_id from tabContact order by creation limit %s, 100'''%(offset), as_dict=1)
+# 		frappe.db.sql(''' update `tabSingles` set value = "%s" where doctype = "API Configuration Page" and field="offset_limit"'''%(cint(offset)+100))
+# 		if customer_data:
+# 			for data in customer_data:
+# 				GetAddress(data.entity_id)
 
-def GetAddress(entity_id):
-	try:
-		h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
-		oauth = GetOauthDetails()
-		customer=frappe.db.get_value('Contact',{'entity_id':entity_id},'customer')
-		if customer:
-			r = requests.get(url='http://digitales.com.au/api/rest/customers/%s/addresses'%(entity_id), headers=h, auth=oauth)
-			cust_address_data=json.loads(r.content)
-			if cust_address_data:
-				for data in cust_address_data:
-					address_entity_id = data.get('entity_id')
-					address_name = frappe.db.get_value('Address', {'entity_id': address_entity_id}, 'name')
-					if not address_name:
-						create_new_address(data, customer)
-					else:
-						update_customer_address(data, address_name, customer)
-	except Exception, e:
-		create_scheduler_exception(e, 'Get Address', entity_id)
+# def GetAddress(entity_id):
+# 	try:
+# 		h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+# 		oauth = GetOauthDetails()
+# 		customer=frappe.db.get_value('Contact',{'entity_id':entity_id},'customer')
+# 		if customer:
+# 			r = requests.get(url='http://digitales.com.au/api/rest/customers/%s/addresses'%(entity_id), headers=h, auth=oauth)
+# 			cust_address_data=json.loads(r.content)
+# 			if cust_address_data:
+# 				for data in cust_address_data:
+# 					address_entity_id = data.get('entity_id')
+# 					address_name = frappe.db.get_value('Address', {'entity_id': address_entity_id}, 'name')
+# 					if not address_name:
+# 						create_new_address(data, customer)
+# 					else:
+# 						update_customer_address(data, address_name, customer)
+# 	except Exception, e:
+# 		create_scheduler_exception(e, 'Get Address', entity_id)
 
-def create_scheduler_exception(msg, method, obj=None):
-	se = frappe.new_doc('Scheduler Log')
-	se.method = method
-	se.error = msg
-	se.obj_traceback = cstr(obj)
-	se.save(ignore_permissions=True)
+# def create_scheduler_exception(msg, method, obj=None):
+# 	se = frappe.new_doc('Scheduler Log')
+# 	se.method = method
+# 	se.error = msg
+# 	se.obj_traceback = cstr(obj)
+# 	se.save(ignore_permissions=True)
 
-def create_new_address(data, customer):
-	try:
-		obj = frappe.new_doc('Address')
-		obj.address_title = cstr(data.get('firstname'))+' '+cstr(data.get('lastname')) +' '+cstr(data.get('entity_id'))
-		customer_address(data, obj, customer)
-		obj.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e, 'create_new_address', customer)
+# def create_new_address(data, customer):
+# 	try:
+# 		obj = frappe.new_doc('Address')
+# 		obj.address_title = cstr(data.get('firstname'))+' '+cstr(data.get('lastname')) +' '+cstr(data.get('entity_id'))
+# 		customer_address(data, obj, customer)
+# 		obj.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e, 'create_new_address', customer)
 
-def update_customer_address(data, address_name, customer):
-	try:
-		obj = frappe.get_doc('Address', address_name)
-		customer_address(data, obj, customer)
-		obj.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e ,'Method name update_customer_address: ', customer)
+# def update_customer_address(data, address_name, customer):
+# 	try:
+# 		obj = frappe.get_doc('Address', address_name)
+# 		customer_address(data, obj, customer)
+# 		obj.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e ,'Method name update_customer_address: ', customer)
 
-def customer_address(data, obj, customer):
-	obj.address_type = get_address_type(data).get('type') # Address Type is Billing or is Shipping??
-	obj.entity_id = cstr(data.get('entity_id'))
-	obj.address_line1 = cstr(data.get('street')[0])
-	obj.address_line2 = cstr(data.get('street')[1]) if len(data.get('street')) > 1 else ""
-	obj.city = cstr(data.get('city'))
-	obj.country = frappe.db.get_value('Country', {'code': data.get('country_id')}, 'name')
-	obj.state = cstr(data.get('region'))
-	obj.pincode = cstr(data.get('postcode'))
-	obj.phone = cstr(data.get('telephone')) or '00000'
-	obj.fax = cstr(data.get('fax'))
-	obj.customer = customer
-	obj.customer_name = cstr(data.get('firstname'))+' '+cstr(data.get('lastname'))
-	obj.is_primary_address = get_address_type(data).get('is_primary_address')
-	obj.is_shipping_address = get_address_type(data).get('is_shipping_address')
+# def customer_address(data, obj, customer):
+# 	obj.address_type = get_address_type(data).get('type') # Address Type is Billing or is Shipping??
+# 	obj.entity_id = cstr(data.get('entity_id'))
+# 	obj.address_line1 = cstr(data.get('street')[0])
+# 	obj.address_line2 = cstr(data.get('street')[1]) if len(data.get('street')) > 1 else ""
+# 	obj.city = cstr(data.get('city'))
+# 	obj.country = frappe.db.get_value('Country', {'code': data.get('country_id')}, 'name')
+# 	obj.state = cstr(data.get('region'))
+# 	obj.pincode = cstr(data.get('postcode'))
+# 	obj.phone = cstr(data.get('telephone')) or '00000'
+# 	obj.fax = cstr(data.get('fax'))
+# 	obj.customer = customer
+# 	obj.customer_name = cstr(data.get('firstname'))+' '+cstr(data.get('lastname'))
+# 	obj.is_primary_address = get_address_type(data).get('is_primary_address')
+# 	obj.is_shipping_address = get_address_type(data).get('is_shipping_address')
 
-def get_address_type(content):
-	if content.get('is_default_billing'):
-		return {"type":"Billing", "is_primary_address":1, "is_shipping_address":0}
-	elif content.get('is_default_shipping'):
-		return {"type":"Shipping", "is_primary_address":0, "is_shipping_address":1}
-	else:
-		return {"type":"Other", "is_primary_address":0, "is_shipping_address":0}
+# def get_address_type(content):
+# 	if content.get('is_default_billing'):
+# 		return {"type":"Billing", "is_primary_address":1, "is_shipping_address":0}
+# 	elif content.get('is_default_shipping'):
+# 		return {"type":"Shipping", "is_primary_address":0, "is_shipping_address":1}
+# 	else:
+# 		return {"type":"Other", "is_primary_address":0, "is_shipping_address":0}
 
-def GetOrders():
-	update_execution_date('Product')
-	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
-	oauth = GetOauthDetails()
-	max_order_date = '2001-09-07 05:43:13'
-	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabSales Order` """,as_list=1)
-	if max_date[0][0]!=None:
-		max_order_date = max_date[0][0]
-	max_order_date = max_order_date.split('.')[0] if '.' in max_order_date else max_order_date
-	max_order_date = (datetime.datetime.strptime(max_order_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
-	status=get_SyncOrdersCount(max_order_date, h, oauth)
+# def GetOrders():
+# 	update_execution_date('Product')
+# 	h = {'Content-Type': 'application/json', 'Accept': 'application/json'}
+# 	oauth = GetOauthDetails()
+# 	max_order_date = '2001-09-07 05:43:13'
+# 	max_date = frappe.db.sql(""" select max(modified_date) as max_date from `tabSales Order` """,as_list=1)
+# 	if max_date[0][0]!=None:
+# 		max_order_date = max_date[0][0]
+# 	max_order_date = max_order_date.split('.')[0] if '.' in max_order_date else max_order_date
+# 	max_order_date = (datetime.datetime.strptime(max_order_date, '%Y-%m-%d %H:%M:%S') - datetime.timedelta(seconds=1)).strftime('%Y-%m-%d %H:%M:%S')
+# 	status=get_SyncOrdersCount(max_order_date, h, oauth)
 
-def get_SyncOrdersCount(max_date, header, oauth_data):
-	count = get_Data_count(max_date, 'orders_pages_per_100_mcount', header, oauth_data)
-	count = 25 if count > 30 else count
-	if count > 0:
-		for index in range(1, count+1):
-			get_orders_from_magento(index, max_date,header, oauth_data, 'missed')
+# def get_SyncOrdersCount(max_date, header, oauth_data):
+# 	count = get_Data_count(max_date, 'orders_pages_per_100_mcount', header, oauth_data)
+# 	count = 25 if count > 30 else count
+# 	if count > 0:
+# 		for index in range(1, count+1):
+# 			get_orders_from_magento(index, max_date,header, oauth_data, 'missed')
 
-addr_details = {}
+# addr_details = {}
 
-def get_orders_from_magento(page, max_date, header, oauth_data,type_of_data=None):
-	if page:
-		r = requests.get(url='http://digitales.com.au/api/rest/orders?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
-		order_data = json.loads(r.content)
-		if len(order_data) > 0:
-			for index in order_data:
-				try:
-					customer = frappe.db.get_value('Contact', {'entity_id': order_data[index].get('customer_id')}, 'customer')
-					if customer:
-						order = frappe.db.get_value('Sales Order', {'entity_id': order_data[index].get('entity_id')}, 'name')
-						if not order:
-							create_order(index,order_data,customer)
-					else:
-						docname = order_data[index].get('entity_id')
-						response = order_data
-						log_sync_error("Sales Order", docname, response, e, "get_orders_from_magento", missing_customer=order_data[index].get('customer_id'))
-						# frappe.throw(_('Customer with id {0} not found in erpnext').format(order_data[index].get('customer_id')))
-				except Exception, e:
-					create_scheduler_exception(e, 'get_orders_from_magento', index)
-	return True
+# def get_orders_from_magento(page, max_date, header, oauth_data,type_of_data=None):
+# 	if page:
+# 		r = requests.get(url='http://digitales.com.au/api/rest/orders?filter[1][attribute]=updated_at&filter[1][gt]=%s&page=%s&limit=100&order=updated_at&dir=asc'%(max_date, page), headers=header, auth=oauth_data)
+# 		order_data = json.loads(r.content)
+# 		if len(order_data) > 0:
+# 			for index in order_data:
+# 				try:
+# 					customer = frappe.db.get_value('Contact', {'entity_id': order_data[index].get('customer_id')}, 'customer')
+# 					if customer:
+# 						order = frappe.db.get_value('Sales Order', {'entity_id': order_data[index].get('entity_id')}, 'name')
+# 						if not order:
+# 							create_order(index,order_data,customer)
+# 					else:
+# 						docname = order_data[index].get('entity_id')
+# 						response = order_data
+# 						log_sync_error("Sales Order", docname, response, e, "get_orders_from_magento", missing_customer=order_data[index].get('customer_id'))
+# 						# frappe.throw(_('Customer with id {0} not found in erpnext').format(order_data[index].get('customer_id')))
+# 				except Exception, e:
+# 					create_scheduler_exception(e, 'get_orders_from_magento', index)
+# 	return True
 
-def create_or_update_customer_address(address_details, customer):
-	address_type_mapper = {'billing': 'Billing', 'shipping': 'Shipping'}
-	if address_details:
-		for address in address_details:
-			address_type = address_type_mapper.get(address.get('address_type'))
-			if not frappe.db.get_value('Address',{'address_title': address.get('firstname') +' '+address.get('lastname') +' '+address.get('street'), 'address_type': address_type},'name'):
-				create_address_forCustomer(address, customer, address_type)
-			else:
-				cust_address=frappe.db.get_value('Address',{'address_title': address.get('firstname') +' '+address.get('lastname') +' '+address.get('street'), 'address_type': address_type},'name')
-				update_address_forCustomer(cust_address,address,customer,address_type)
+# def create_or_update_customer_address(address_details, customer):
+# 	address_type_mapper = {'billing': 'Billing', 'shipping': 'Shipping'}
+# 	if address_details:
+# 		for address in address_details:
+# 			address_type = address_type_mapper.get(address.get('address_type'))
+# 			if not frappe.db.get_value('Address',{'address_title': address.get('firstname') +' '+address.get('lastname') +' '+address.get('street'), 'address_type': address_type},'name'):
+# 				create_address_forCustomer(address, customer, address_type)
+# 			else:
+# 				cust_address=frappe.db.get_value('Address',{'address_title': address.get('firstname') +' '+address.get('lastname') +' '+address.get('street'), 'address_type': address_type},'name')
+# 				update_address_forCustomer(cust_address,address,customer,address_type)
 
-def create_address_forCustomer(address_details, customer, address_type):
-	try:
-		cad = frappe.new_doc('Address')
-		cad.address_title = address_details.get('firstname')+' '+address_details.get('lastname') +' '+address_details.get('street')
-		cad.address_type = address_type
-		cad.address_line1 = address_details.get('street')
-		cad.city = address_details.get('city')
-		cad.state = address_details.get('region')
-		cad.pincode = address_details.get('postcode')
-		cad.phone = address_details.get('telephone') or '00000'
-		cad.customer = customer
-		cad.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name create_address_forCustomer: ' , customer)
+# def create_address_forCustomer(address_details, customer, address_type):
+# 	try:
+# 		cad = frappe.new_doc('Address')
+# 		cad.address_title = address_details.get('firstname')+' '+address_details.get('lastname') +' '+address_details.get('street')
+# 		cad.address_type = address_type
+# 		cad.address_line1 = address_details.get('street')
+# 		cad.city = address_details.get('city')
+# 		cad.state = address_details.get('region')
+# 		cad.pincode = address_details.get('postcode')
+# 		cad.phone = address_details.get('telephone') or '00000'
+# 		cad.customer = customer
+# 		cad.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name create_address_forCustomer: ' , customer)
 
-def update_address_forCustomer(cust_address,address_details, customer, address_type):
-	try:
-		cad = frappe.get_doc('Address',cust_address)
-		cad.address_type = address_type
-		cad.address_line1 = address_details.get('street')
-		cad.city = address_details.get('city')
-		cad.state = address_details.get('region')
-		cad.pincode = address_details.get('postcode')
-		cad.phone = address_details.get('telephone') or '00000'
-		cad.customer = customer
-		cad.save(ignore_permissions=True)
-	except Exception, e:
-		create_scheduler_exception(e , 'Method name update_address_forCustomer: ', customer)
+# def update_address_forCustomer(cust_address,address_details, customer, address_type):
+# 	try:
+# 		cad = frappe.get_doc('Address',cust_address)
+# 		cad.address_type = address_type
+# 		cad.address_line1 = address_details.get('street')
+# 		cad.city = address_details.get('city')
+# 		cad.state = address_details.get('region')
+# 		cad.pincode = address_details.get('postcode')
+# 		cad.phone = address_details.get('telephone') or '00000'
+# 		cad.customer = customer
+# 		cad.save(ignore_permissions=True)
+# 	except Exception, e:
+# 		create_scheduler_exception(e , 'Method name update_address_forCustomer: ', customer)
 
-def update_order(order,i,content,customer):
-	try:
-		order = frappe.get_doc("Sales Order", order)
-		create_new_order(order,i,content,customer)
-		order.save(ignore_permissions=True)
-		print order.name
-	except Exception, e:
-		docname = content[i].get('entity_id')
-		response = content
-		log_sync_error("Sales Order", docname, response, e, "update_order")
+# def update_order(order,i,content,customer):
+# 	try:
+# 		order = frappe.get_doc("Sales Order", order)
+# 		create_new_order(order,i,content,customer)
+# 		order.save(ignore_permissions=True)
+# 		print order.name
+# 	except Exception, e:
+# 		docname = content[i].get('entity_id')
+# 		response = content
+# 		log_sync_error("Sales Order", docname, response, e, "update_order")
 
-def create_order(i,content,customer):
-	missing_items = []
-	try:
-		if content[i].get('order_items'):
-			missing_items = check_item_presence(i,content)
-			if not missing_items:
-				order = frappe.new_doc('Sales Order')
-				create_new_order(order,i,content,customer)
-				order.save(ignore_permissions=True)
-			else:
-				frappe.throw(_("Few of the Items in Order #%s are missing or not yet synced"%(content[i].get("increment_id"))))
-	except Exception, e:
-		docname = content[i].get('entity_id')
-		response = content
-		log_sync_error("Sales Order", docname, response, e, "create_order", missing_items=missing_items)
+# def create_order(i,content,customer):
+# 	missing_items = []
+# 	try:
+# 		if content[i].get('order_items'):
+# 			missing_items = check_item_presence(i,content)
+# 			if not missing_items:
+# 				order = frappe.new_doc('Sales Order')
+# 				create_new_order(order,i,content,customer)
+# 				order.save(ignore_permissions=True)
+# 			else:
+# 				frappe.throw(_("Few of the Items in Order #%s are missing or not yet synced"%(content[i].get("increment_id"))))
+# 	except Exception, e:
+# 		docname = content[i].get('entity_id')
+# 		response = content
+# 		log_sync_error("Sales Order", docname, response, e, "create_order", missing_items=missing_items)
 
-def create_new_order(order,index,content,customer):
-	from datetime import date
-	from dateutil.relativedelta import relativedelta
-	delivery_date = date.today() + relativedelta(days=+6)
-	order.customer=customer
-	order.entity_id=content[index].get('entity_id')
-	order.modified_date=content[index].get('updated_at')
-	order.delivery_date=delivery_date
-	order.grand_total_export=content[index].get('grand_total')
-	order.order_number_details = content[index].get('increment_id')
-	order.po_no=content[index].get('po_number')
+# def create_new_order(order,index,content,customer):
+# 	from datetime import date
+# 	from dateutil.relativedelta import relativedelta
+# 	delivery_date = date.today() + relativedelta(days=+6)
+# 	order.customer=customer
+# 	order.entity_id=content[index].get('entity_id')
+# 	order.modified_date=content[index].get('updated_at')
+# 	order.delivery_date=delivery_date
+# 	order.grand_total_export=content[index].get('grand_total')
+# 	order.order_number_details = content[index].get('increment_id')
+# 	order.po_no=content[index].get('po_number')
 
-	# If Order type is general then set SO order type as Standard Order
-	if content[index].get('order_type') == "General" or content[index].get('order_type') == None:
-		order.new_order_type="Standard Order"
-	else:
-		order.new_order_type=content[index].get('order_type')
-	for i in content[index].get('order_items'):
- 		create_child_item(i,order)
+# 	# If Order type is general then set SO order type as Standard Order
+# 	if content[index].get('order_type') == "General" or content[index].get('order_type') == None:
+# 		order.new_order_type="Standard Order"
+# 	else:
+# 		order.new_order_type=content[index].get('order_type')
+# 	for i in content[index].get('order_items'):
+#  		create_child_item(i,order)
 
- 	# # set shipping and billing address
- 	set_sales_order_address(content[index].get('addresses'),order)
+#  	# # set shipping and billing address
+#  	set_sales_order_address(content[index].get('addresses'),order)
 
-def set_sales_order_address(address_details, order):
-	# Check if Address is available if it is then set addr id in SO else set None
-	address_type_mapper = {'billing': 'Billing', 'shipping': 'Shipping'}
-	if address_details:
-		for address in address_details:
-			addr_filter = {'entity_id': cstr(address.get('customer_address_id'))}
-			cust_address = frappe.db.get_value('Address',addr_filter,'name')
-			if cust_address:
-				# Check the address type if billing the set to billing addr likewise for shipping
-				if cstr(address.get('address_type')) == "billing":
-					order.customer_address = frappe.db.get_value('Address',{'entity_id':cust_address},'name')
-				if cstr(address.get('address_type')) == "shipping":
-					order.shipping_address_name = frappe.db.get_value('Address',{'entity_id':cust_address},'name')
+# def set_sales_order_address(address_details, order):
+# 	# Check if Address is available if it is then set addr id in SO else set None
+# 	address_type_mapper = {'billing': 'Billing', 'shipping': 'Shipping'}
+# 	if address_details:
+# 		for address in address_details:
+# 			addr_filter = {'entity_id': cstr(address.get('customer_address_id'))}
+# 			cust_address = frappe.db.get_value('Address',addr_filter,'name')
+# 			if cust_address:
+# 				# Check the address type if billing the set to billing addr likewise for shipping
+# 				if cstr(address.get('address_type')) == "billing":
+# 					order.customer_address = frappe.db.get_value('Address',{'entity_id':cust_address},'name')
+# 				if cstr(address.get('address_type')) == "shipping":
+# 					order.shipping_address_name = frappe.db.get_value('Address',{'entity_id':cust_address},'name')
 
-def check_item_presence(key,content):
-	missing_items = []
-	for i in content[key].get('order_items'):
-		if not frappe.db.get_value('Item',i.get('sku'),'name'):
-			error = Exception("%s Item from order #%s is missing or not synced"%(
-						i.get('sku'),
-						content[key].get("increment_id") or ""
-					))
-			log_sync_error("Item", i.get('sku'), content, error, "check_item_presence")
-			missing_items.append(i.get('sku'))
-	return missing_items
+# def check_item_presence(key,content):
+# 	missing_items = []
+# 	for i in content[key].get('order_items'):
+# 		if not frappe.db.get_value('Item',i.get('sku'),'name'):
+# 			error = Exception("%s Item from order #%s is missing or not synced"%(
+# 						i.get('sku'),
+# 						content[key].get("increment_id") or ""
+# 					))
+# 			log_sync_error("Item", i.get('sku'), content, error, "check_item_presence")
+# 			missing_items.append(i.get('sku'))
+# 	return missing_items
 
-def create_child_item(i,order):
-	oi = order.append('sales_order_details', {})
-	oi.item_code=i['sku']
-	if i['sku']:
-		item_release_date=frappe.db.sql("""select product_release_date from `tabItem`
-								where name='%s'"""%i['sku'],as_list=1)
-		if item_release_date:
-			oi.release_date_of_item=item_release_date[0][0]
-	oi.qty=i['qty_ordered']
-	oi.rate=i['price']
-	art = frappe.db.get_value("Item", i['sku'],"artist")
-	if art:
-		oi.artist = art
-	# oi.amount=i['row_total_incl_tax']
-	return True
+# def create_child_item(i,order):
+# 	oi = order.append('sales_order_details', {})
+# 	oi.item_code=i['sku']
+# 	if i['sku']:
+# 		item_release_date=frappe.db.sql("""select product_release_date from `tabItem`
+# 								where name='%s'"""%i['sku'],as_list=1)
+# 		if item_release_date:
+# 			oi.release_date_of_item=item_release_date[0][0]
+# 	oi.qty=i['qty_ordered']
+# 	oi.rate=i['price']
+# 	art = frappe.db.get_value("Item", i['sku'],"artist")
+# 	if art:
+# 		oi.artist = art
+# 	# oi.amount=i['row_total_incl_tax']
+# 	return True
 
 
 @frappe.whitelist()

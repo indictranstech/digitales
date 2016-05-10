@@ -1,48 +1,5 @@
 import frappe
-from .utils import (date_minus_sec, get_entity_and_page_count, get_entities_from_magento,
-	log_sync_status) 
-from digitales.digitales.Api_methods import update_execution_date, log_sync_error
-
-def get_products():
-	""" 
-		get newly created / updated product from magento
-		fetch the product based on updated_at field in magento
-	"""
-	count = {}
-	sync_stat = {}
-	page_count = 0
-	total_items_to_sync = 0
-	try:
-		max_date = frappe.db.sql("select max(modified_date) as max_date from tabItem", as_dict=True)
-		max_date = "1991-09-07 05:43:13" if not max_date else max_date[0].get("max_date")
-		count = get_entity_and_page_count(max_date, entity_type="Item")
-		if not count:
-			return
-
-		total_items_to_sync = count.get("entity_count")
-		page_count = count.get("page_count") + 1 if count.get("page_count") else 0
-
-		url = "http://digitales.com.au/api/rest/products?filter[1][attribute]=updated_at"
-		url += "&filter[1][gt]={}&page={}&limit=100&order=updated_at&dir=asc"
-		for idx in xrange(1, page_count):
-			response = get_entities_from_magento(url.format(date_minus_sec(max_date), idx), entity_type="Item")
-			if not response:
-				continue
-
-			sync_stat = { entity_id: { "modified_date": entity.get("updated_at") } for entity_id, entity in response.iteritems() }
-			for entity_id, item in response.iteritems():
-				status = create_or_update_item(item)
-				sync_stat.update(status)
-				# frappe.db.commit()
-	except Exception, e:
-		print frappe.get_traceback()
-		raise e
-	finally:
-		log_sync_status(
-			"Item", count_response=count, entities_to_sync=total_items_to_sync, 
-			pages_to_sync=page_count, synced_entities=sync_stat
-		)
-		update_execution_date('Customer')
+from .utils import log_sync_error
 
 def create_or_update_item(entity):
 	""" create or update the Item """
@@ -71,7 +28,6 @@ def create_or_update_item(entity):
 		item.product_release_date = entity.get('release_date')
 		item.default_supplier = get_supplier(entity.get('distributor'))
 		item.expense_account, item.income_account = default_ExpenxeIncomeAccount(item.item_group)
-
 		item.save(ignore_permissions=True)
 
 		return {

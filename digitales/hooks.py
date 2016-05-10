@@ -102,11 +102,11 @@ doc_events = {
 
 scheduler_events = {
 	"all": [
-		"digitales.digitales.Api_methods.check_APItime"
+		"digitales.sync.sync_entities.sync_entity_from_magento"
 	],
-	"hourly": [
-		"digitales.sync_csv.check_lastdate_api"
-	],
+	# "hourly": [
+	# 	"digitales.sync_csv.check_lastdate_api"
+	# ],
 	"daily": [
 		"digitales.digitales.sync_missing_entities.notifiy_stopped_entities_status"
 	]

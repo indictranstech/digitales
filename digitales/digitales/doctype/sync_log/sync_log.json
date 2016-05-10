@@ -2,12 +2,12 @@
  "allow_copy": 0, 
  "allow_import": 0, 
  "allow_rename": 0, 
- "autoname": "synclog.#####", 
+ "autoname": "log-.#####", 
  "creation": "2015-08-15 00:17:59.623216", 
  "custom": 0, 
  "docstatus": 0, 
  "doctype": "DocType", 
- "document_type": "", 
+ "document_type": "System", 
  "fields": [
   {
    "allow_on_submit": 0, 
@@ -18,7 +18,7 @@
    "ignore_user_permissions": 0, 
    "in_filter": 0, 
    "in_list_view": 1, 
-   "label": "Date", 
+   "label": "Sync Start", 
    "no_copy": 0, 
    "permlevel": 0, 
    "precision": "", 
@@ -28,6 +28,13 @@
    "reqd": 0, 
    "search_index": 0, 
    "set_only_once": 0
+  }, 
+  {
+   "fieldname": "sync_end", 
+   "fieldtype": "Datetime", 
+   "label": "Sync End", 
+   "permlevel": 0, 
+   "precision": ""
   }, 
   {
    "fieldname": "column_break_2", 
@@ -40,6 +47,13 @@
    "fieldtype": "Select", 
    "label": "Entity Type", 
    "options": "Item\nCustomer\nSales Order", 
+   "permlevel": 0, 
+   "precision": ""
+  }, 
+  {
+   "fieldname": "sync_time", 
+   "fieldtype": "Time", 
+   "label": "Sync Time", 
    "permlevel": 0, 
    "precision": ""
   }, 
@@ -181,7 +195,7 @@
  "is_submittable": 0, 
  "issingle": 0, 
  "istable": 0, 
- "modified": "2016-05-10 00:18:33.553332", 
+ "modified": "2016-05-10 15:50:47.185437", 
  "modified_by": "Administrator", 
  "module": "digitales", 
  "name": "Sync Log", 

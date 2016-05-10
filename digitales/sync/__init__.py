@@ -1,3 +1,3 @@
-from products import get_products
-from customers import get_customers
-from orders import get_orders
+from products import create_or_update_item
+from customers import create_or_update_customer
+from orders import create_or_update_sales_order

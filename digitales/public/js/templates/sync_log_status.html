@@ -3,20 +3,22 @@
 		overflow-y: scroll;
 		max-height: 300px 
 	}
-	.sucess {
-		/*background-color: rgba(0, 128, 0, 0.24)*/
-	}
 	.error {
-		background-color: rgba(233, 30, 99, 0.24)
+		background-color: rgba(233, 30, 99, 0.24) !important
 	}
 	.log-text {
 		color: rgba(0, 0, 0, 0.85);
 	}
+	.table-striped > tbody > tr:nth-child(odd) > td,
+	.table-striped > tbody > tr:nth-child(odd) > th {
+	    background-color: rgba(115, 118, 115, 0.32);
+	}
 </style>
 <div class="log-stat">
-  <table class="table table-bordered table-condensed">
+  <table class="table table-bordered table-striped table-condensed">
 	   <thead>
 	      <tr>
+	      	<td align="center"><b>IDX</b></input></td>
 	        <td align="center"><b>Entity ID</b></input></td>
 	        <td align="center"><b>ERPNext ID</b></td>
 	        <td align="center"><b>Status</b></td>
@@ -24,9 +26,11 @@
 	      </tr>
 	    </thead>
 	    <tbody>
+	    {% var idx = 1 %}
 	    {% $.each(entities, function(entity_id, entity){ %}
-	    {% var cls = entity.operation? "sucess": "error" %}
+	    {% var cls = entity.operation? "": "error"; %}
 			<tr>
+				<td class="small log-text {%=cls%}" align="center">{%= idx++ %}</td>
 				<td class="small log-text {%=cls%}" align="center">{%= entity_id %}</td>
 				<td class="small log-text {%=cls%}" align="center">{%= entity.name || "NA" %}</td>
 				<td class="small log-text {%=cls%}" align="center">{%= entity.operation || "Sync Failed" %}</td>

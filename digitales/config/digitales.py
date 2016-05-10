@@ -40,6 +40,13 @@ def get_data():
 			"items": [
 				{
 					"type": "doctype",
+					"icon": "icon-table",
+					"name": "Sync Log",
+					"label": _("Sync Log"),
+					"description": _("Magento > ERPNext Synchronization Logs")
+				},
+				{
+					"type": "doctype",
 					"name": "Sync Error Log",
 					"label": _("Sync Error Log"),
 					"description": _("Magento > ERPNext Synchronization Error Logs")
