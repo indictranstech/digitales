@@ -112,11 +112,10 @@ def get_entity_ids_to_sync(entity_type=None, results=None):
 
 			if sales_order: entities.append(entity_id)
 	else:
-		frappe.errprint(results)
 		entities = list(set([result.get("sync_docname") for result in results]))
 		if entities: entities = check_if_entity_already_synced(entity_type, entities)
 
-	return entities
+	return entities[:100] if entity_type == "Sales Order" else entities[:30]
 
 def update_sync_status(entity_type, entities):
 	""" update the sync error log status to Yes if entity is synced """
@@ -209,3 +208,10 @@ def notifiy_stopped_entities_status():
 					names=",".join(["'%s'"%entity.get("name") for entity in entities])
 				)
 	frappe.db.sql(query)
+
+def get_sync_error_entities_count(entity_type="Item"):
+	""" get total unsync entities count """
+	entities = get_entity_ids_to_sync(entity_type)
+	if not entities:
+		return 0
+	return len(entities) or 0

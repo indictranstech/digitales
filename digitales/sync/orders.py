@@ -1,5 +1,6 @@
 import frappe
 from .utils import log_sync_error
+from frappe.utils import add_days, nowdate
 
 def create_or_update_sales_order(entity):
 	""" create new Sales Order """
@@ -22,7 +23,7 @@ def create_or_update_sales_order(entity):
 			so.customer = customer
 			so.entity_id = entity.get('entity_id')
 			so.modified_date = entity.get('updated_at')
-			so.delivery_date = date.today() + relativedelta(days=+6)
+			so.delivery_date = add_days(nowdate(), 6)
 			so.grand_total_export = entity.get('grand_total')
 			so.order_number_details = entity.get('increment_id')
 			so.po_no = entity.get('po_number')
@@ -75,3 +76,17 @@ def get_missing_items(items, increment_id):
 			log_sync_error("Item", i.get('sku'), content, error, "check_item_presence")
 			missing_items.append(item.get('sku'))
 	return missing_items
+
+def set_sales_order_address(address_details, order):
+	# Check if Address is available if it is then set addr id in SO else set None
+	address_type_mapper = {'billing': 'Billing', 'shipping': 'Shipping'}
+	if not address_details:
+		return
+	for address in address_details:
+		addr_filter = { 'entity_id': address.get('customer_address_id') }
+		cust_address = frappe.db.get_value('Address', addr_filter)
+		if cust_address and address.get('address_type') == "billing":
+			# Check the address type if billing the set to billing addr likewise for shipping
+			order.customer_address = frappe.db.get_value('Address',{ 'entity_id':cust_address })
+		elif cust_address and address.get('address_type') == "shipping":
+			order.shipping_address_name = frappe.db.get_value('Address', { 'entity_id':cust_address })

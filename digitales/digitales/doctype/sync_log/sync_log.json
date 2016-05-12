@@ -86,6 +86,14 @@
    "set_only_once": 0
   }, 
   {
+   "description": "Total number of entities received In scheduler while Magento  >> ERP sync", 
+   "fieldname": "received", 
+   "fieldtype": "Int", 
+   "label": "# Entities Received", 
+   "permlevel": 0, 
+   "precision": ""
+  }, 
+  {
    "fieldname": "column_break_6", 
    "fieldtype": "Column Break", 
    "permlevel": 0, 
@@ -195,7 +203,7 @@
  "is_submittable": 0, 
  "issingle": 0, 
  "istable": 0, 
- "modified": "2016-05-10 15:50:47.185437", 
+ "modified": "2016-05-11 16:54:45.776273", 
  "modified_by": "Administrator", 
  "module": "digitales", 
  "name": "Sync Log", 

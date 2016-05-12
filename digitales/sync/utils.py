@@ -70,8 +70,8 @@ def get_entities_from_magento(url, entity_type=None):
 def log_sync_status(
 	entity_type, count_response={},
 	entities_to_sync=0, pages_to_sync=0,
-	synced_entities={}, start=None,
-	end=None):
+	entities_received=0, synced_entities={},
+	start=None, end=None):
 
 	""" log Magento >> ERPNext entity sync status """
 
@@ -81,6 +81,7 @@ def log_sync_status(
 	log.sync_time = end - start
 	log.entity_type = entity_type
 	log.total_count = entities_to_sync
+	log.received = entities_received
 	log.pagewise_count = pages_to_sync - 1 if pages_to_sync else 0
 	log.synced_failed = len([entity_id for entity_id, status in synced_entities.iteritems() if status.get("operation") == None])
 	log.synced_count = len([entity_id for entity_id, status in synced_entities.iteritems() if status.get("operation") != None])
@@ -135,13 +136,15 @@ def GetOauthDetails():
 
 #update configuration
 def update_execution_date(document):
-	now_plus_10 = datetime.datetime.now() + datetime.timedelta(minutes = 30)
-	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='date'"""%(now_plus_10.strftime('%Y-%m-%d %H:%M:%S')))
-	frappe.db.sql("""update `tabSingles` set value='%s' where doctype='API Configuration Page' and field='api_type'"""%(document))
+	scheduler_time = get_datetime(now()) + datetime.timedelta(minutes = 30)
+	doc = frappe.get_doc("API Configuration Page", "API Configuration Page")
+	doc.date = scheduler_time.strftime('%Y-%m-%d %H:%M:%S')
+	doc.api_type = document
+	doc.save(ignore_permissions=True)
 
 def create_scheduler_exception(msg, method, obj=None):
 	se = frappe.new_doc('Scheduler Log')
 	se.method = method
 	se.error = msg
-	se.obj_traceback = cstr(obj)
+	se.obj_traceback = obj
 	se.save(ignore_permissions=True)

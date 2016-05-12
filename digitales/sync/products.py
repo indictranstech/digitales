@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import cstr
 from .utils import log_sync_error
 
 def create_or_update_item(entity):
@@ -11,17 +12,17 @@ def create_or_update_item(entity):
 		name = frappe.db.get_value("Item", entity.get("sku"))
 		if not name:
 			item = frappe.new_doc("Item")
-			item.item_code = entity.get("sku")
+			item.item_code = cstr(entity.get("sku"))
 		else:
 			item = frappe.get_doc("Item", name)
 
-		item.event_id = entity.get("entity_id")
+		item.event_id = cstr(entity.get("entity_id"))
 		item.artist = entity.get('artist')
-		item.item_name = entity.get('name') or entity.get('sku')
+		item.item_name = cstr(entity.get('name')) or cstr(entity.get('sku'))
 		item.item_group = get_item_group(entity.get('media'))
-		item.description = 'Desc: %s'%entity.get('short_description') if entity.get('short_description') else entity.get('sku')
+		item.description = 'Desc: %s'%entity.get('short_description') if entity.get('short_description') else cstr(entity.get('sku'))
 		item.default_warehouse = get_own_warehouse()
-		if entity.get('barcode') and not frappe.db.get_value('Item', {'barcode':entity.get('barcode')}, 'name'):
+		if entity.get('barcode') and not frappe.db.get_value('Item', { 'barcode':entity.get('barcode') }):
 			item.barcode = entity.get('barcode')
 		item.modified_date = entity.get('updated_at')
 		item.distributor = entity.get('distributor')
@@ -31,14 +32,14 @@ def create_or_update_item(entity):
 		item.save(ignore_permissions=True)
 
 		return {
-			entity.get("entity_id"): {
+			cstr(entity.get("sku")): {
 				"operation": "Item Created" if not name else "Item Updated",
 				"name": item.name,
 				"modified_date": entity.get("updated_at")
 			}
 		}
 	except Exception, e:
-		docname = entity.get('sku')
+		docname = cstr(entity.get('sku'))
 		response = entity
 		log_sync_error("Item", docname, response, e, "create_item")
 
@@ -69,10 +70,10 @@ def get_own_warehouse():
 def get_supplier(supplier):
 	temp = ''
 	if supplier:
-		if frappe.db.get_value('Customer', supplier, 'name'):
+		if frappe.db.get_value('Customer', supplier):
 			supplier = supplier + '(s)'
 			temp = supplier
-		name = supplier if frappe.db.get_value('Supplier', supplier, 'name') else create_supplier(supplier)
+		name = supplier if frappe.db.get_value('Supplier', supplier) else create_supplier(supplier)
 		if temp:
 			update_supplier(supplier)
 		return name
@@ -86,7 +87,7 @@ def update_supplier(supplier):
 def create_supplier(supplier):
 	sl = frappe.new_doc('Supplier')
 	sl.supplier_name = supplier
-	sl.supplier_type = 'Stock supplier' if frappe.db.get_value('Supplier Type', 'Stock supplier', 'name') else create_supplier_type()
+	sl.supplier_type = 'Stock supplier' if frappe.db.get_value('Supplier Type', 'Stock supplier') else create_supplier_type()
 	sl.save(ignore_permissions=True)
 	return sl.name
 
