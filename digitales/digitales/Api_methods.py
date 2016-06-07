@@ -34,14 +34,7 @@ def check_ispurchase_item(doc,method):
 				Stock_Availability(doc,d)
 				assign_extra_qty_to_other(d)
 			else:
-				bin_details = frappe.db.sql(''' select ifnull(sum(soi.qty), 0) - ifnull(sum(soi.delivered_qty), 0)  from
-                                               `tabSales Order Item` soi, `tabSales Order` so where soi.parent = so.name
-                                               and ifnull(soi.stop_status, "No") <> "Yes" and so.status <> "Stopped" and soi.docstatus = 1
-                                               and soi.item_code ="%s" and soi.warehouse = "%s" '''%(d.item_code, d.warehouse), as_list=1)
-				so_qty = flt(bin_details[0][0]) if bin_details else 0.0
-				po_qty = get_po_qty(d.item_code, d.warehouse) - so_qty # if negative then make po
-				if po_qty < 0:
-					create_purchase_order_record(doc,d, flt(po_qty*-1))
+				create_purchase_order_record(doc,d, d.qty)
 
 def Stock_Availability(so_doc, child_args):
 	bin_details = frappe.db.get_value('Bin', {'item_code': child_args.item_code, 'warehouse': child_args.warehouse}, '*', as_dict=1)
