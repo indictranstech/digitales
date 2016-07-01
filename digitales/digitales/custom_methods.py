@@ -13,15 +13,3 @@ def send_mail_SchedulerLog(doc, method):
 def delivery_note(doctype, txt, searchfield, start, page_len, filters):
 	return frappe.db.sql(''' select name from `tabDelivery Note`
 		where docstatus <> 2 and name like "%%%s%%" limit %s, %s'''%(txt, start, page_len), as_list = 1)
-
-# def attendance_workflow(doc, method):
-# 	user = frappe.session.user
-# 	if doc.workflow_state == "Approved" and user != doc.attendance_approver:
-# 		frappe.throw(_("Only {0} can Approved this").format(doc.attendance_approver))
-# 	elif doc.workflow_state == "Approved" and user == doc.attendance_approver:
-# 		doc.workflow_state = "Approved By Manager"
-# 		doc.docstatus = 1
-		
-# def cancel_attendance(doc,method):
-# 	doc.workflow_state = "Cancelled"
-# 	doc.docstatus = 2

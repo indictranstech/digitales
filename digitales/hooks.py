@@ -97,6 +97,9 @@ doc_events = {
 
 	"Purchase Order": {
 		"validate": "digitales.digitales.Api_methods.fetch_barcode_supplier"
+	},
+	"Attendance": {
+		"before_save": "erpnext.hr.doctype.attendance.attendance.user_validation"
 	}
 }
 
